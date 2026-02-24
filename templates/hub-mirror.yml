@@ -41,6 +41,7 @@ spec:
     dst-token:
       description: "Destination API token"
       type: string
+      default: ""
 
     src-account-type:
       description: "Source account type (user/org/group)"
