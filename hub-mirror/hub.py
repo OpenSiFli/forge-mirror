@@ -126,7 +126,7 @@ class Hub(object):
         headers, params = self._get_src_auth()
 
         while True:
-            query = {
+            query: Dict[str, Any] = {
                 "page": page,
                 "per_page": per_page,
             }

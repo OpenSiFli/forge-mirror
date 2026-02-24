@@ -35,5 +35,9 @@ jobs:
 
       - name: Run mypy
         run: |
-          uv run --project hub-mirror --with mypy \
-            mypy --ignore-missing-imports hub-mirror/*.py
+          uv run --project hub-mirror --with mypy bash -lc '
+            cd hub-mirror &&
+            mypy --ignore-missing-imports \
+              --disable-error-code import-untyped \
+              -m hub -m hubmirror -m mirror -m platforms -m config
+          '

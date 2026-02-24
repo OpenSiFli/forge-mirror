@@ -138,7 +138,7 @@ class HubMirror(object):
 
 
 def add_options(
-    options: List[Callable[[Callable[..., None]], Callable[..., None]]],
+    options: Sequence[Callable[[Any], Any]],
 ) -> Callable[[Callable[..., None]], Callable[..., None]]:
     def decorator(func: Callable[..., None]) -> Callable[..., None]:
         for option in reversed(options):

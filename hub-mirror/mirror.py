@@ -270,7 +270,7 @@ class Mirror(object):
                 f"Remote exists, re-create: set {self.hub.dst_type} "
                 f"to {self.dst_url}"
             )
-            local_repo.delete_remote(self.hub.dst_type)
+            local_repo.delete_remote(local_repo.remote(self.hub.dst_type))
             local_repo.create_remote(self.hub.dst_type, self.dst_url)
 
         refspecs: List[str] = self._build_refspecs(self.refs, local_repo)

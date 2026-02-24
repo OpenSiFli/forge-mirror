@@ -37,6 +37,10 @@ class GitPlatform(ABC):
     api_base: str
     repo_field: str
 
+    def __init__(self, endpoint: str = "") -> None:
+        # Keep a uniform constructor signature for typing convenience.
+        del endpoint
+
     def _join_account_path(self, account: str) -> str:
         return f"/{account}" if account else ""
 
