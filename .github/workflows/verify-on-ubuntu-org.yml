@@ -8,18 +8,25 @@ jobs:
     name: Run
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout source code
-      uses: actions/checkout@v1
-    - name: Mirror Github to Gitee
-      uses: ./.
-      with:
-        src: github/hub-mirror-action
-        dst: gitee/hub-mirror-action
-        dst_key: ${{ secrets.GITEE_PRIVATE_KEY }}
-        dst_token: ${{ secrets.GITEE_TOKEN }}
-        account_type: org
-        # Only sync normal repo
-        black_list: 'test'
-        white_list: 'normal,test,empty'
-        force_update: true
-        debug: true
+      - name: Checkout source code
+        uses: actions/checkout@v4
+      - name: Mirror Github to Gitee
+        uses: ./.
+        with:
+          src_platform: github
+          src_account: hub-mirror-action
+          dst_platform: gitee
+          dst_account: hub-mirror-action
+          dst_key: ${{ secrets.GITEE_PRIVATE_KEY }}
+          dst_token: ${{ secrets.GITEE_TOKEN }}
+          src_account_type: org
+          dst_account_type: org
+          repos: |
+            include:
+              - normal
+              - test
+              - empty
+            exclude:
+              - test
+          push_strategy: force
+          log_level: DEBUG

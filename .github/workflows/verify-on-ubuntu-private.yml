@@ -1,23 +1,30 @@
 on:
   pull_request_target:
     branches: [master]
-name: Tests / test-user-mirror
+name: Tests / test-user-mirror-private
 jobs:
   run:
     name: Run
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout source codes
-      uses: actions/checkout@v1
-    - name: Mirror Github to Gitee with white list
-      uses: ./.
-      with:
-        src: github/Yikun
-        dst: gitee/yikunkero
-        dst_key: ${{ secrets.GITEE_PRIVATE_KEY }}
-        dst_token:  ${{ secrets.GITEE_TOKEN }}
-        static_list: 'hashes,simple-spring'
-        force_update: true
-        debug: true
-        mappings: 'hashes=>private_hashes,simple-spring=>private_simple-spring'
-        dst_visibility: 'private'
+      - name: Checkout source codes
+        uses: actions/checkout@v4
+      - name: Mirror Github to Gitee private repos
+        uses: ./.
+        with:
+          src_platform: github
+          src_account: Yikun
+          dst_platform: gitee
+          dst_account: yikunkero
+          dst_key: ${{ secrets.GITEE_PRIVATE_KEY }}
+          dst_token: ${{ secrets.GITEE_TOKEN }}
+          repos: |
+            static:
+              - hashes
+              - simple-spring
+            mappings:
+              hashes: private_hashes
+              simple-spring: private_simple-spring
+          push_strategy: force
+          log_level: DEBUG
+          dst_visibility: private

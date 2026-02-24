@@ -8,16 +8,23 @@ jobs:
     name: Run
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout source codes
-      uses: actions/checkout@v1
-    - name: Mirror Github to Gitee with white list
-      uses: ./.
-      with:
-        src: github/Yikun
-        dst: gitee/yikunkero
-        dst_key: ${{ secrets.GITEE_PRIVATE_KEY }}
-        dst_token:  ${{ secrets.GITEE_TOKEN }}
-        static_list: 'hub-mirror-action,hashes, simple-spring'
-        force_update: true
-        debug: true
-        mappings: 'hashes=>hashes_gitee'
+      - name: Checkout source codes
+        uses: actions/checkout@v4
+      - name: Mirror Github to Gitee with static repos
+        uses: ./.
+        with:
+          src_platform: github
+          src_account: Yikun
+          dst_platform: gitee
+          dst_account: yikunkero
+          dst_key: ${{ secrets.GITEE_PRIVATE_KEY }}
+          dst_token: ${{ secrets.GITEE_TOKEN }}
+          repos: |
+            static:
+              - hub-mirror-action
+              - hashes
+              - simple-spring
+            mappings:
+              hashes: hashes_gitee
+          push_strategy: force
+          log_level: DEBUG
