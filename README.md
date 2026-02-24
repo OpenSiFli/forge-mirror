@@ -2,7 +2,9 @@
 
 简体中文 | [English](./README_en.md)
 
-一个用于在hub间（例如Github，Gitee, Gitlab 和 Gitcode）账户代码仓库同步的action
+一个用于在hub间（例如Github，Gitee, Gitlab 和 Gitcode）账户代码仓库同步的action。
+
+原本是 https://github.com/Yikun/hub-mirror-action/ 的一个fork，现在已经独立维护，欢迎使用和贡献。
 
 ## 用法
 
