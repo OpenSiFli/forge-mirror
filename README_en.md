@@ -45,7 +45,8 @@ Common optional:
 - `dst_key` (required when `dst_transport=ssh`)
 - `src_token` (for source-side API authentication, private repo visibility, and rate limits)
 - `src_account_type` / `dst_account_type` (default `user`)
-- `src_endpoint` / `dst_endpoint` (self-hosted endpoints)
+- `src_endpoint` / `dst_endpoint` (repository endpoints used for clone/push)
+- `src_api_endpoint` / `dst_api_endpoint` (API endpoints; override platform API request address when set)
 - `src_transport` (default `https`)
 - `dst_transport` (default `ssh`)
 - `ssh_user` (default `git`)
@@ -59,6 +60,26 @@ Common optional:
 - `dst_visibility` (`auto` / `public` / `private`)
 
 See [`action.yml`](./action.yml) for the full schema.
+
+### Self-hosted GitLab: Separate SSH and API Endpoints
+
+If SSH and API addresses (or ports) are different, configure them separately:
+
+```yaml
+with:
+  dst_platform: gitlab
+  dst_account: sifli
+  dst_transport: ssh
+  dst_endpoint: gitlab.sifli.com:8218
+  dst_api_endpoint: gitlab.sifli.com
+  dst_key: ${{ secrets.GITLAB_SSH_KEY }}
+  dst_token: ${{ secrets.GITLAB_TOKEN }}
+```
+
+Notes:
+- `dst_endpoint` is used for git clone/push repository URLs
+- `dst_api_endpoint` is only used for GitLab API calls (repo existence check, create repo, visibility update, etc.)
+- The same pattern applies on source side with `src_endpoint` + `src_api_endpoint`
 
 ## `repos` Parameter Deep Dive
 
@@ -312,4 +333,4 @@ include:
 | (none) | `src_token` |
 | (none) | `repos.refs` |
 | (none) | `dst_platform: git` |
-
+| (none) | `src_api_endpoint` / `dst_api_endpoint` |

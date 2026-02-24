@@ -1,6 +1,6 @@
 # Forge Mirror
 
-简体中文 | English（待更新）
+简体中文 | [English](./README_en.md)
 
 Forge Mirror 是一个用于在 GitHub、Gitee、GitLab、GitCode 以及通用 Git 服务之间同步仓库的自动化工具。
 
@@ -45,7 +45,8 @@ steps:
 - `dst_key`（`dst_transport=ssh` 时必填）
 - `src_token`（用于源端 API 认证，提升私有仓库可见性与 API 限额）
 - `src_account_type` / `dst_account_type`（默认 `user`）
-- `src_endpoint` / `dst_endpoint`（自托管地址）
+- `src_endpoint` / `dst_endpoint`（代码仓库地址，SSH/HTTPS clone 与 push 使用）
+- `src_api_endpoint` / `dst_api_endpoint`（API 地址；配置后将覆盖对应平台 API 请求地址）
 - `src_transport`（默认 `https`）
 - `dst_transport`（默认 `ssh`）
 - `ssh_user`（默认 `git`）
@@ -59,6 +60,26 @@ steps:
 - `dst_visibility`（`auto` / `public` / `private`）
 
 完整定义请参考 [`action.yml`](./action.yml)。
+
+### 自建 GitLab 场景：SSH 与 API 地址分离
+
+当 SSH 和 API 地址（或端口）不同，可分开配置：
+
+```yaml
+with:
+  dst_platform: gitlab
+  dst_account: sifli
+  dst_transport: ssh
+  dst_endpoint: gitlab.sifli.com:8218
+  dst_api_endpoint: gitlab.sifli.com
+  dst_key: ${{ secrets.GITLAB_SSH_KEY }}
+  dst_token: ${{ secrets.GITLAB_TOKEN }}
+```
+
+说明：
+- `dst_endpoint` 用于 git clone/push（SSH/HTTPS 仓库 URL）
+- `dst_api_endpoint` 仅用于 GitLab API（仓库存在性检查、创建仓库、可见性更新等）
+- 源端同理可使用 `src_endpoint` + `src_api_endpoint`
 
 ## `repos` 参数详解（重点）
 
@@ -312,3 +333,4 @@ include:
 | （无） | `src_token` |
 | （无） | `repos.refs` |
 | （无） | `dst_platform: git` |
+| （无） | `src_api_endpoint` / `dst_api_endpoint` |
