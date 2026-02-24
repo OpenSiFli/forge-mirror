@@ -69,14 +69,13 @@ class Hub(object):
         )
 
     def has_dst_repo(self, repo_name: str) -> bool:
-        url: str = self.dst_platform.repo_list_url(
-            self.dst_account, self.dst_account_type
+        return self.dst_platform.repo_exists(
+            self.session,
+            self.dst_account,
+            repo_name,
+            self.dst_token,
+            self.api_timeout,
         )
-        repo_names: List[str] = self._get_all_repo_names(url)
-        if not repo_names:
-            logger.warning("Destination repos is [].")
-            return False
-        return repo_name in repo_names
 
     def create_dst_repo(self, repo_name: str) -> bool:
         created: bool = False
@@ -97,9 +96,12 @@ class Hub(object):
         return created
 
     def dynamic_list(self) -> List[str]:
-        url: str = self.src_platform.repo_list_url(
-            self.src_account, self.src_account_type
-        )
+        try:
+            url: str = self.src_platform.repo_list_url(
+                self.src_account, self.src_account_type
+            )
+        except NotImplementedError as exc:
+            raise ValueError(str(exc)) from exc
         return self._get_all_repo_names(url)
 
     def update_dst_repo_visibility(
