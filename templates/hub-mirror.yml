@@ -15,67 +15,79 @@ spec:
     cache-path:
       description: "Directory to cache repo clones (relative to CI project dir)"
       default: "hub-mirror-cache"
-    src:
-      description: "Source account, e.g. github/kunpengcompute"
+
+    src-platform:
+      description: "Source platform (github/gitee/gitlab/gitcode/git)"
+      default: "github"
+    src-account:
+      description: "Source account or organization name"
       type: string
-    dst:
-      description: "Destination account, e.g. gitee/kunpengcompute"
+    dst-platform:
+      description: "Destination platform (github/gitee/gitlab/gitcode/git)"
       type: string
+    dst-account:
+      description: "Destination account or organization name"
+      type: string
+
+    src-key:
+      description: "Source SSH private key (required when src-transport=ssh)"
+      default: ""
     dst-key:
-      description: "SSH private key for destination"
-      type: string
+      description: "Destination SSH private key (required when dst-transport=ssh)"
+      default: ""
+    src-token:
+      description: "Source API token"
+      default: ""
     dst-token:
-      description: "API token for destination"
+      description: "Destination API token"
       type: string
-    account-type:
-      description: "Account type: user/org/group"
-      default: "user"
+
     src-account-type:
-      description: "Source account type override"
-      default: ""
+      description: "Source account type (user/org/group)"
+      default: "user"
     dst-account-type:
-      description: "Destination account type override"
-      default: ""
+      description: "Destination account type (user/org/group)"
+      default: "user"
+
     src-endpoint:
-      description: "Source GitLab endpoint for self-hosted"
+      description: "Source self-hosted endpoint (e.g. gitlab.example.com)"
       default: ""
     dst-endpoint:
-      description: "Destination GitLab endpoint for self-hosted"
+      description: "Destination self-hosted endpoint"
       default: ""
-    clone-style:
-      description: "Clone style: https or ssh"
+
+    repos:
+      description: "YAML repos configuration"
+      default: ""
+
+    src-transport:
+      description: "Source transport (https/ssh)"
       default: "https"
-    black-list:
-      description: "Comma-separated blacklist of repos"
-      default: ""
-    white-list:
-      description: "Comma-separated whitelist of repos"
-      default: ""
-    static-list:
-      description: "Comma-separated static repo list"
-      default: ""
-    force-update:
-      description: "Force push to destination"
-      type: boolean
-      default: false
-    debug:
-      description: "Enable debug logs"
-      type: boolean
-      default: false
+    dst-transport:
+      description: "Destination transport (https/ssh)"
+      default: "ssh"
+    ssh-user:
+      description: "SSH username"
+      default: "git"
+    push-strategy:
+      description: "Push strategy: safe/force/no"
+      default: "safe"
+    log-level:
+      description: "Log level: DEBUG/INFO/WARNING/ERROR"
+      default: "INFO"
     timeout:
       description: "Timeout per git command, e.g. 30m"
       default: "30m"
     api-timeout:
-      description: "API request timeout in seconds"
-      type: number
-      default: 60
-    mappings:
-      description: "Repo mappings, e.g. A=>B, C=>CC"
-      default: ""
+      description: "API timeout, e.g. 60, 2m"
+      default: "60"
     lfs:
       description: "Enable Git LFS support"
       type: boolean
       default: false
+    dst-visibility:
+      description: "Destination visibility: auto/public/private"
+      default: "auto"
 ---
 "$[[ inputs.job-name ]]":
   stage: $[[ inputs.stage ]]
@@ -90,11 +102,29 @@ spec:
       - $[[ inputs.cache-path ]]
   script:
     - set -eu
+    - SRC_TRANSPORT="$[[ inputs.src-transport ]]"
+    - DST_TRANSPORT="$[[ inputs.dst-transport ]]"
     - LFS="$[[ inputs.lfs ]]"
     - mkdir -p ~/.ssh
-    - printf "%s" "$[[ inputs.dst-key ]]" > ~/.ssh/id_rsa
-    - chmod 600 ~/.ssh/id_rsa
-    - printf "StrictHostKeyChecking no\n" >> ~/.ssh/config
+    - |
+      if [ "$SRC_TRANSPORT" = "ssh" ]; then
+        if [ -z "$[[ inputs.src-key ]]" ]; then
+          echo "src-key is required when src-transport=ssh" >&2
+          exit 1
+        fi
+        printf "%s" "$[[ inputs.src-key ]]" > ~/.ssh/id_rsa_src
+        chmod 600 ~/.ssh/id_rsa_src
+      fi
+    - |
+      if [ "$DST_TRANSPORT" = "ssh" ]; then
+        if [ -z "$[[ inputs.dst-key ]]" ]; then
+          echo "dst-key is required when dst-transport=ssh" >&2
+          exit 1
+        fi
+        printf "%s" "$[[ inputs.dst-key ]]" > ~/.ssh/id_rsa_dst
+        chmod 600 ~/.ssh/id_rsa_dst
+      fi
+    - printf "StrictHostKeyChecking no\nUserKnownHostsFile /dev/null\n" >> ~/.ssh/config
     - |
       if [ "$LFS" = "true" ]; then
         git lfs install
@@ -107,22 +137,24 @@ spec:
       mkdir -p "$CACHE_PATH"
     - |
       hubmirror \
-        --src "$[[ inputs.src ]]" \
-        --dst "$[[ inputs.dst ]]" \
+        --src-platform "$[[ inputs.src-platform ]]" \
+        --src-account "$[[ inputs.src-account ]]" \
+        --dst-platform "$[[ inputs.dst-platform ]]" \
+        --dst-account "$[[ inputs.dst-account ]]" \
         --dst-token "$[[ inputs.dst-token ]]" \
-        --account-type "$[[ inputs.account-type ]]" \
+        --src-token "$[[ inputs.src-token ]]" \
         --src-account-type "$[[ inputs.src-account-type ]]" \
         --dst-account-type "$[[ inputs.dst-account-type ]]" \
         --src-endpoint "$[[ inputs.src-endpoint ]]" \
         --dst-endpoint "$[[ inputs.dst-endpoint ]]" \
-        --clone-style "$[[ inputs.clone-style ]]" \
+        --src-transport "$[[ inputs.src-transport ]]" \
+        --dst-transport "$[[ inputs.dst-transport ]]" \
+        --ssh-user "$[[ inputs.ssh-user ]]" \
         --cache-path "$CACHE_PATH" \
-        --black-list "$[[ inputs.black-list ]]" \
-        --white-list "$[[ inputs.white-list ]]" \
-        --static-list "$[[ inputs.static-list ]]" \
-        --force-update "$[[ inputs.force-update ]]" \
-        --debug "$[[ inputs.debug ]]" \
+        --repos "$[[ inputs.repos ]]" \
+        --push-strategy "$[[ inputs.push-strategy ]]" \
+        --log-level "$[[ inputs.log-level ]]" \
         --timeout "$[[ inputs.timeout ]]" \
         --api-timeout "$[[ inputs.api-timeout ]]" \
-        --mappings "$[[ inputs.mappings ]]" \
-        --lfs "$[[ inputs.lfs ]]"
+        --lfs "$[[ inputs.lfs ]]" \
+        --dst-visibility "$[[ inputs.dst-visibility ]]"
