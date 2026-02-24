@@ -8,6 +8,23 @@ from platforms import RepoVisibility
 ALLOWED_PUSH_STRATEGIES = ("safe", "force", "no")
 
 
+def cov2sec(value: str) -> int:
+    unit_to_seconds = {
+        "s": 1,
+        "m": 60,
+        "h": 3600,
+        "d": 86400,
+        "w": 604800,
+    }
+    text = str(value).strip()
+    if not text:
+        raise ValueError("duration cannot be empty")
+    unit = text[-1]
+    if unit in unit_to_seconds:
+        return int(text[:-1]) * unit_to_seconds[unit]
+    return int(text)
+
+
 @dataclass(frozen=True)
 class RefsConfig:
     branches_include: List[str] = field(default_factory=lambda: ["*"])

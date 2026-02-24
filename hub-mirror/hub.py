@@ -1,5 +1,4 @@
 import logging
-import time
 from typing import Any, Dict, List, Tuple
 
 import requests
@@ -91,8 +90,6 @@ class Hub(object):
             )
         else:
             logger.info(f"{repo_name} repo exist, skip creating...")
-        if created:
-            time.sleep(2)
         return created
 
     def dynamic_list(self) -> List[str]:

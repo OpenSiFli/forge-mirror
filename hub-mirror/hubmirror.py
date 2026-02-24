@@ -6,11 +6,10 @@ from typing import Any, Callable, List, Optional, Sequence
 
 import click
 
-from config import parse_repos_config, resolve_repo_config
+from config import cov2sec, parse_repos_config, resolve_repo_config
 from hub import Hub
 from mirror import Mirror
 from platforms import ALLOWED_VISIBILITY, RepoVisibility
-from utils import cov2sec
 
 logger = logging.getLogger(__name__)
 

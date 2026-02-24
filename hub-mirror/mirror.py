@@ -9,9 +9,8 @@ from typing import List, Optional
 import git
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from config import RefsConfig
+from config import RefsConfig, cov2sec
 from hub import Hub
-from utils import cov2sec
 
 logger = logging.getLogger(__name__)
 
