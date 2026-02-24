@@ -1,15 +1,25 @@
-# Hub Mirror Action
+# Forge Mirror
 
-简体中文 | [English](./README_en.md)
+简体中文 | English（待更新）
 
-在 GitHub、Gitee、GitLab、GitCode（以及裸 Git 服务）之间同步仓库的 Action。
+Forge Mirror 是一个用于在 GitHub、Gitee、GitLab、GitCode 以及通用 Git 服务之间同步仓库的自动化工具。
+
+开源地址：<https://github.com/OpenSiFli/forge-mirror>
+
+## 项目关系说明
+
+本项目是 <https://github.com/Yikun/hub-mirror-action/> 的 fork 后继产品。
+
+- 我们继承了上游项目的核心能力与使用习惯。
+- 在此基础上，持续推进参数体系重构、配置结构化（YAML）、可维护性和测试覆盖。
+- 文档中提到的 v2 参数与行为，以本仓库的 `action.yml` 和源码实现为准。
 
 ## 快速开始
 
 ```yaml
 steps:
   - name: Mirror GitHub org to Gitee org
-    uses: Yikun/hub-mirror-action@master
+    uses: OpenSiFli/forge-mirror@v2
     with:
       src_platform: github
       src_account: kunpengcompute
@@ -21,7 +31,7 @@ steps:
       dst_account_type: org
 ```
 
-## 参数概览（v2）
+## 输入参数概览（v2）
 
 必填：
 - `src_account`
@@ -33,84 +43,220 @@ steps:
 - `src_platform`（默认 `github`）
 - `src_key`（`src_transport=ssh` 时必填）
 - `dst_key`（`dst_transport=ssh` 时必填）
-- `src_token`（用于源端 API 认证）
+- `src_token`（用于源端 API 认证，提升私有仓库可见性与 API 限额）
 - `src_account_type` / `dst_account_type`（默认 `user`）
 - `src_endpoint` / `dst_endpoint`（自托管地址）
 - `src_transport`（默认 `https`）
 - `dst_transport`（默认 `ssh`）
 - `ssh_user`（默认 `git`）
-- `repos`（YAML 仓库配置）
-- `push_strategy`（`safe`/`force`/`no`）
-- `log_level`（`DEBUG`/`INFO`/`WARNING`/`ERROR`）
+- `repos`（YAML 仓库配置，详见下文）
+- `push_strategy`（`safe` / `force` / `no`）
+- `log_level`（`DEBUG` / `INFO` / `WARNING` / `ERROR`）
 - `timeout`（如 `30m`）
 - `api_timeout`（如 `60`、`2m`）
 - `cache_path`
 - `lfs`
-- `dst_visibility`（`auto`/`public`/`private`）
+- `dst_visibility`（`auto` / `public` / `private`）
 
-完整定义以 [`action.yml`](./action.yml) 为准。
+完整定义请参考 [`action.yml`](./action.yml)。
 
-## `repos` YAML 配置
+## `repos` 参数详解（重点）
+
+`repos` 是一个 YAML 字符串，用于统一替代 v1 的 `black_list` / `white_list` / `static_list` / `mappings`。
+
+### 结构总览
 
 ```yaml
-with:
-  repos: |
-    static:
-      - repo1
-      - name: repo2
-        dst_name: repo2-renamed
-        visibility: private
-        push_strategy: force
-        refs:
-          branches:
-            include: [main]
-          tags:
-            include: [v*]
+repos: |
+  static:
+    - repo1
+    - name: repo2
+      dst_name: repo2-renamed
+      visibility: private
+      push_strategy: force
+      refs:
+        branches:
+          include: [main]
+        tags:
+          include: [v*]
 
-    include:
-      - repo1
-      - repo2
+  include:
+    - repo1
+    - repo2
 
-    exclude:
-      - archived-repo
+  exclude:
+    - archived-repo
 
-    mappings:
-      old-name: new-name
+  mappings:
+    old-name: new-name
 
+  refs:
+    branches:
+      include: [main, release/*]
+      exclude: [feature/*]
+    tags:
+      include: [v*]
+      exclude: [v*-rc*]
+```
+
+### 顶层字段语义
+
+- `static`
+  - 类型：`list`
+  - 作用：显式指定要同步的仓库列表。
+  - 若 `static` 非空：不再调用源端 API 动态拉取仓库列表。
+  - 若 `static` 为空：会动态获取源账号下仓库列表。
+
+- `include`
+  - 类型：`list[str]`
+  - 作用：白名单过滤，仅保留列表内仓库。
+  - 为空时表示不过滤。
+
+- `exclude`
+  - 类型：`list[str]`
+  - 作用：黑名单过滤，从候选仓库中剔除。
+  - 过滤顺序：先 `include` 再 `exclude`。
+
+- `mappings`
+  - 类型：`dict[str, str]`
+  - 作用：全局仓库名映射，`源仓库名 -> 目标仓库名`。
+
+- `refs`
+  - 类型：refs 过滤配置（详见下一节）
+  - 作用：全局分支/标签同步规则。
+
+### `static` 的两种写法
+
+1. 简写字符串（仅仓库名）
+
+```yaml
+static:
+  - repo1
+  - repo2
+```
+
+2. 对象写法（单仓库覆写）
+
+```yaml
+static:
+  - name: repo2
+    dst_name: repo2-renamed
+    visibility: private
+    push_strategy: force
     refs:
       branches:
-        include: [main, release/*]
-        exclude: [feature/*]
-      tags:
-        include: [v*]
-        exclude: [v*-rc*]
+        include: [main]
 ```
 
-优先级：
-1. `dst_name`: per-repo > `mappings` > 同名
-2. `visibility`: per-repo > `dst_visibility` > `auto`
-3. `push_strategy`: per-repo > 全局 `push_strategy` > `safe`
-4. `refs`: per-repo 完整覆盖全局 `refs`
+对象字段说明：
+- `name`：源仓库名
+- `dst_name`：目标仓库名（可重命名）
+- `visibility`：该仓库目标可见性策略（`auto/public/private`）
+- `push_strategy`：该仓库推送策略（`safe/force/no`）
+- `refs`：该仓库的 refs 同步规则（完整覆盖全局 `refs`）
 
-## Refs 过滤示例
+### 合并优先级（非常重要）
 
-只同步 `main` 分支，不同步任何 tag：
+对单个仓库最终配置，优先级如下：
+
+1. `dst_name`：`static` 单仓库 `dst_name` > 全局 `mappings` > 同名
+2. `visibility`：`static` 单仓库 `visibility` > 全局 `dst_visibility` > `auto`
+3. `push_strategy`：`static` 单仓库 `push_strategy` > 全局 `push_strategy` > `safe`
+4. `refs`：`static` 单仓库 `refs` 完整覆盖全局 `refs`（非 merge）
+
+### 常见使用模式
+
+1. 动态拉取 + include/exclude
 
 ```yaml
-with:
-  repos: |
-    static:
-      - name: repo-a
-        refs:
-          branches:
-            include: [main]
-          tags:
-            include: []
+repos: |
+  include: [repo-a, repo-b, repo-c]
+  exclude: [repo-c]
 ```
 
-## 裸 Git 平台示例
+2. 静态列表 + 重命名
 
-同步到任意 Git 服务器（不依赖平台 API）：
+```yaml
+repos: |
+  static:
+    - name: old-repo
+      dst_name: new-repo
+```
+
+3. 仓库级别强制推送
+
+```yaml
+repos: |
+  static:
+    - name: release-repo
+      push_strategy: force
+```
+
+## `refs` 参数详解（重点）
+
+`refs` 控制“同步哪些分支和标签（tag）”。支持全局配置和 per-repo 配置。
+
+### 结构
+
+```yaml
+refs:
+  branches:
+    include: ["*"]
+    exclude: []
+  tags:
+    include: ["*"]
+    exclude: []
+```
+
+### 匹配规则
+
+- 通配符语义使用 `fnmatch`：
+  - `*`：任意字符
+  - `?`：单个字符
+- 执行顺序：先 `include`，再 `exclude`
+- `exclude` 优先级高于 `include`
+
+### 默认行为
+
+- `refs` 未配置：同步所有分支与所有 tag（与 v1 行为一致）
+- `include` 未配置：默认 `[*]`（全包含）
+- `include: []`：不包含任何项
+- `exclude` 未配置：默认空列表
+
+### per-repo 与全局关系
+
+- 当某个仓库在 `static` 中配置了 `refs`，它会完整覆盖全局 `refs`。
+- 覆盖是“整块替换”，不是字段级合并。
+
+### 示例：仅同步 main 分支，不同步 tag
+
+```yaml
+repos: |
+  static:
+    - name: repo-a
+      refs:
+        branches:
+          include: [main]
+        tags:
+          include: []
+```
+
+### 示例：仅同步 release 分支和正式版本 tag
+
+```yaml
+repos: |
+  refs:
+    branches:
+      include: [release/*]
+      exclude: [release/tmp-*]
+    tags:
+      include: [v*]
+      exclude: [v*-rc*]
+```
+
+## 裸 Git 平台（`dst_platform: git`）
+
+用于接入任意 Git 服务器（例如自建 Gitea/Gogs/裸 SSH 服务器）。
 
 ```yaml
 with:
@@ -128,8 +274,9 @@ with:
 ```
 
 说明：
-- `platform=git` 时不支持动态仓库列表，必须使用 `repos.static`
-- 不执行 create/update visibility API
+- `platform=git` 不支持 API 仓库枚举，必须提供 `repos.static`
+- 不执行 create_repo / update_visibility API
+- `dst_transport=https` 时，push URL 支持 token 内嵌认证
 
 ## GitLab CI Component
 
@@ -137,9 +284,9 @@ with:
 
 ```yaml
 include:
-  - component: $CI_SERVER_FQDN/your-group/hub-mirror-action/hub-mirror@2.0.0
+  - component: $CI_SERVER_FQDN/your-group/forge-mirror/hub-mirror@2.0.0
     inputs:
-      image: $CI_REGISTRY/your-group/hub-mirror-action:latest
+      image: $CI_REGISTRY/your-group/forge-mirror:latest
       src-platform: github
       src-account: kunpengcompute
       dst-platform: gitee
@@ -165,4 +312,3 @@ include:
 | （无） | `src_token` |
 | （无） | `repos.refs` |
 | （无） | `dst_platform: git` |
-

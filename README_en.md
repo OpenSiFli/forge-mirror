@@ -1,15 +1,25 @@
-# Hub Mirror Action
+# Forge Mirror
 
 English | [简体中文](./README.md)
 
-Mirror repositories between GitHub, Gitee, GitLab, GitCode, and generic Git servers.
+Forge Mirror is an automation tool for mirroring repositories across GitHub, Gitee, GitLab, GitCode, and generic Git servers.
+
+Open source: <https://github.com/OpenSiFli/forge-mirror>
+
+## Project Lineage
+
+This project is the fork-based successor of <https://github.com/Yikun/hub-mirror-action/>.
+
+- We keep the core capabilities and usage model from the upstream project.
+- We continue to evolve parameter design, structured YAML config, maintainability, and test coverage.
+- For v2 behavior and parameter definitions, `action.yml` and source code in this repository are the source of truth.
 
 ## Quick Start
 
 ```yaml
 steps:
   - name: Mirror GitHub org to Gitee org
-    uses: Yikun/hub-mirror-action@master
+    uses: OpenSiFli/forge-mirror@v2
     with:
       src_platform: github
       src_account: kunpengcompute
@@ -21,7 +31,7 @@ steps:
       dst_account_type: org
 ```
 
-## Inputs (v2)
+## Input Overview (v2)
 
 Required:
 - `src_account`
@@ -33,84 +43,220 @@ Common optional:
 - `src_platform` (default `github`)
 - `src_key` (required when `src_transport=ssh`)
 - `dst_key` (required when `dst_transport=ssh`)
-- `src_token` (source API authentication)
+- `src_token` (for source-side API authentication, private repo visibility, and rate limits)
 - `src_account_type` / `dst_account_type` (default `user`)
-- `src_endpoint` / `dst_endpoint` (self-hosted endpoint)
+- `src_endpoint` / `dst_endpoint` (self-hosted endpoints)
 - `src_transport` (default `https`)
 - `dst_transport` (default `ssh`)
 - `ssh_user` (default `git`)
-- `repos` (YAML repo config)
-- `push_strategy` (`safe`/`force`/`no`)
-- `log_level` (`DEBUG`/`INFO`/`WARNING`/`ERROR`)
+- `repos` (YAML repository config, see details below)
+- `push_strategy` (`safe` / `force` / `no`)
+- `log_level` (`DEBUG` / `INFO` / `WARNING` / `ERROR`)
 - `timeout` (for example `30m`)
 - `api_timeout` (for example `60`, `2m`)
 - `cache_path`
 - `lfs`
-- `dst_visibility` (`auto`/`public`/`private`)
+- `dst_visibility` (`auto` / `public` / `private`)
 
-See [`action.yml`](./action.yml) for the complete source of truth.
+See [`action.yml`](./action.yml) for the full schema.
 
-## `repos` YAML Config
+## `repos` Parameter Deep Dive
+
+`repos` is a YAML string that replaces v1 parameters: `black_list`, `white_list`, `static_list`, and `mappings`.
+
+### Full shape
 
 ```yaml
-with:
-  repos: |
-    static:
-      - repo1
-      - name: repo2
-        dst_name: repo2-renamed
-        visibility: private
-        push_strategy: force
-        refs:
-          branches:
-            include: [main]
-          tags:
-            include: [v*]
+repos: |
+  static:
+    - repo1
+    - name: repo2
+      dst_name: repo2-renamed
+      visibility: private
+      push_strategy: force
+      refs:
+        branches:
+          include: [main]
+        tags:
+          include: [v*]
 
-    include:
-      - repo1
-      - repo2
+  include:
+    - repo1
+    - repo2
 
-    exclude:
-      - archived-repo
+  exclude:
+    - archived-repo
 
-    mappings:
-      old-name: new-name
+  mappings:
+    old-name: new-name
 
+  refs:
+    branches:
+      include: [main, release/*]
+      exclude: [feature/*]
+    tags:
+      include: [v*]
+      exclude: [v*-rc*]
+```
+
+### Top-level fields
+
+- `static`
+  - Type: `list`
+  - Purpose: explicit source repository list.
+  - If non-empty: dynamic API listing is skipped.
+  - If empty: repositories are listed dynamically from source account.
+
+- `include`
+  - Type: `list[str]`
+  - Purpose: allowlist filter.
+  - Empty means no allowlist filtering.
+
+- `exclude`
+  - Type: `list[str]`
+  - Purpose: denylist filter.
+  - Filter order is: `include` first, then `exclude`.
+
+- `mappings`
+  - Type: `dict[str, str]`
+  - Purpose: global name mapping (`source_repo -> destination_repo`).
+
+- `refs`
+  - Type: refs filter config (detailed below).
+  - Purpose: global branch/tag sync rules.
+
+### Two `static` item formats
+
+1. String shorthand (repo name only)
+
+```yaml
+static:
+  - repo1
+  - repo2
+```
+
+2. Object form (per-repo override)
+
+```yaml
+static:
+  - name: repo2
+    dst_name: repo2-renamed
+    visibility: private
+    push_strategy: force
     refs:
       branches:
-        include: [main, release/*]
-        exclude: [feature/*]
-      tags:
-        include: [v*]
-        exclude: [v*-rc*]
+        include: [main]
 ```
 
-Priority:
-1. `dst_name`: per-repo > `mappings` > same name
-2. `visibility`: per-repo > `dst_visibility` > `auto`
-3. `push_strategy`: per-repo > global `push_strategy` > `safe`
-4. `refs`: per-repo fully overrides global `refs`
+Per-repo object fields:
+- `name`: source repo name
+- `dst_name`: destination repo name
+- `visibility`: per-repo visibility policy (`auto/public/private`)
+- `push_strategy`: per-repo push policy (`safe/force/no`)
+- `refs`: per-repo refs rules (fully overrides global `refs`)
 
-## Refs Filtering Example
+### Merge priority (important)
 
-Only sync `main` and no tags:
+Final config priority per repository:
+
+1. `dst_name`: per-repo `dst_name` > global `mappings` > original name
+2. `visibility`: per-repo `visibility` > global `dst_visibility` > `auto`
+3. `push_strategy`: per-repo `push_strategy` > global `push_strategy` > `safe`
+4. `refs`: per-repo `refs` fully overrides global `refs` (no deep merge)
+
+### Typical patterns
+
+1. Dynamic listing + include/exclude
 
 ```yaml
-with:
-  repos: |
-    static:
-      - name: repo-a
-        refs:
-          branches:
-            include: [main]
-          tags:
-            include: []
+repos: |
+  include: [repo-a, repo-b, repo-c]
+  exclude: [repo-c]
 ```
 
-## Bare Git Platform Example
+2. Static list + rename
 
-Mirror to any Git server without platform API support:
+```yaml
+repos: |
+  static:
+    - name: old-repo
+      dst_name: new-repo
+```
+
+3. Force push only for specific repositories
+
+```yaml
+repos: |
+  static:
+    - name: release-repo
+      push_strategy: force
+```
+
+## `refs` Parameter Deep Dive
+
+`refs` controls which branches and tags are synchronized. It supports both global and per-repo scopes.
+
+### Shape
+
+```yaml
+refs:
+  branches:
+    include: ["*"]
+    exclude: []
+  tags:
+    include: ["*"]
+    exclude: []
+```
+
+### Matching rules
+
+- Wildcards follow `fnmatch` semantics:
+  - `*`: any sequence of characters
+  - `?`: any single character
+- Evaluation order: `include` first, then `exclude`
+- `exclude` wins over `include`
+
+### Default behavior
+
+- If `refs` is not set: sync all branches and all tags (same as v1 default)
+- If `include` is not set: defaults to `[*]`
+- If `include: []`: matches nothing
+- If `exclude` is not set: defaults to empty list
+
+### Global vs per-repo
+
+- If a repository defines `refs` under `static`, that block fully overrides global `refs`.
+- Override is block-level replacement, not field-level merge.
+
+### Example: only sync `main`, no tags
+
+```yaml
+repos: |
+  static:
+    - name: repo-a
+      refs:
+        branches:
+          include: [main]
+        tags:
+          include: []
+```
+
+### Example: only release branches and stable version tags
+
+```yaml
+repos: |
+  refs:
+    branches:
+      include: [release/*]
+      exclude: [release/tmp-*]
+    tags:
+      include: [v*]
+      exclude: [v*-rc*]
+```
+
+## Bare Git Platform (`dst_platform: git`)
+
+Use this for arbitrary Git servers (for example self-hosted Gitea/Gogs/plain SSH Git).
 
 ```yaml
 with:
@@ -128,18 +274,19 @@ with:
 ```
 
 Notes:
-- `platform=git` does not support dynamic repo listing, so `repos.static` is required
-- create/update visibility API operations are skipped
+- `platform=git` does not support API-based dynamic listing, so `repos.static` is required
+- create/update visibility API calls are skipped
+- when `dst_transport=https`, push URL supports embedded token auth
 
 ## GitLab CI Component
 
-This repository includes `templates/hub-mirror.yml`.
+This repository provides `templates/hub-mirror.yml`.
 
 ```yaml
 include:
-  - component: $CI_SERVER_FQDN/your-group/hub-mirror-action/hub-mirror@2.0.0
+  - component: $CI_SERVER_FQDN/your-group/forge-mirror/hub-mirror@2.0.0
     inputs:
-      image: $CI_REGISTRY/your-group/hub-mirror-action:latest
+      image: $CI_REGISTRY/your-group/forge-mirror:latest
       src-platform: github
       src-account: kunpengcompute
       dst-platform: gitee
@@ -156,7 +303,7 @@ include:
 | --- | --- |
 | `src: github/account` | `src_platform: github` + `src_account: account` |
 | `dst: gitee/account` | `dst_platform: gitee` + `dst_account: account` |
-| `private_key` | removed; use `src_key` / `dst_key` |
+| `private_key` | removed; use `src_key` / `dst_key` separately |
 | `account_type` | `src_account_type` + `dst_account_type` |
 | `clone_style` | `src_transport` + `dst_transport` |
 | `debug: true` | `log_level: DEBUG` |
