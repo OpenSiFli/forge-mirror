@@ -1,7 +1,6 @@
-import functools
 import logging
 import time
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 import requests
 
@@ -13,25 +12,34 @@ logger = logging.getLogger(__name__)
 class Hub(object):
     def __init__(
         self,
-        src: str,
-        dst: str,
+        src_platform: str,
+        src_account: str,
+        dst_platform: str,
+        dst_account: str,
         dst_token: str,
-        account_type: str = "user",
-        clone_style: str = "https",
-        src_account_type: str = "",
-        dst_account_type: str = "",
+        src_token: str = "",
+        src_account_type: str = "user",
+        dst_account_type: str = "user",
         src_endpoint: str = "",
         dst_endpoint: str = "",
+        src_transport: str = "https",
+        dst_transport: str = "ssh",
+        ssh_user: str = "git",
         api_timeout: int = 60,
         dst_visibility: RepoVisibility = RepoVisibility.AUTO,
     ) -> None:
         self.api_timeout: int = api_timeout
-        self.account_type: str = account_type
-        self.src_account_type: str = src_account_type or account_type
-        self.dst_account_type: str = dst_account_type or account_type
+        self.src_account_type: str = src_account_type
+        self.dst_account_type: str = dst_account_type
         self.dst_visibility: RepoVisibility = dst_visibility
-        self.src_type, self.src_account = src.split("/")
-        self.dst_type, self.dst_account = dst.split("/")
+        self.src_type: str = src_platform
+        self.dst_type: str = dst_platform
+        self.src_account: str = src_account
+        self.dst_account: str = dst_account
+        self.src_transport: str = src_transport
+        self.dst_transport: str = dst_transport
+        self.ssh_user: str = ssh_user
+
         self.src_platform: GitPlatform = get_platform(
             self.src_type, endpoint=src_endpoint
         )
@@ -44,13 +52,20 @@ class Hub(object):
         self.dst_platform.validate_account_type(
             self.dst_account_type, "destination"
         )
+
+        self.src_token: str = src_token
         self.dst_token: str = dst_token
         self.session: requests.Session = requests.Session()
         self.src_repo_base: str = self.src_platform.get_clone_repo_base(
-            self.src_account, clone_style
+            self.src_account,
+            self.src_transport,
+            ssh_user=self.ssh_user,
         )
         self.dst_repo_base: str = self.dst_platform.get_push_repo_base(
-            self.dst_account
+            self.dst_account,
+            self.dst_transport,
+            token=self.dst_token,
+            ssh_user=self.ssh_user,
         )
 
     def has_dst_repo(self, repo_name: str) -> bool:
@@ -97,20 +112,43 @@ class Hub(object):
             self.api_timeout,
         )
 
-    @functools.lru_cache
     def _get_all_repo_names(self, url: str, page: int = 1) -> List[str]:
         per_page: int = 60
-        api: str = url + f"?page={page}&per_page=" + str(per_page)
-        # TODO: src_token support
-        response: requests.Response = self.session.get(
-            api, timeout=self.api_timeout
-        )
         all_items: List[str] = []
-        if response.status_code != 200:
-            logger.error(f"Repo getting failed: {response.text}")
-            return all_items
-        items: List[Dict[str, Any]] = response.json()
-        if items:
-            names: List[str] = [i["name"] for i in items]
-            return names + self._get_all_repo_names(url, page=page + 1)
-        return all_items
+        headers, params = self._get_src_auth()
+
+        while True:
+            query = {
+                "page": page,
+                "per_page": per_page,
+            }
+            query.update(params)
+            response: requests.Response = self.session.get(
+                url,
+                headers=headers,
+                params=query,
+                timeout=self.api_timeout,
+            )
+            if response.status_code != 200:
+                logger.error(f"Repo getting failed: {response.text}")
+                return all_items
+
+            items: List[Dict[str, Any]] = response.json()
+            if not items:
+                return all_items
+
+            all_items.extend([i["name"] for i in items])
+            page += 1
+
+    def _get_src_auth(self) -> Tuple[Dict[str, str], Dict[str, str]]:
+        if not self.src_token:
+            return {}, {}
+
+        platform_name = self.src_platform.name
+        if platform_name == "github":
+            return {"Authorization": f"token {self.src_token}"}, {}
+        if platform_name in ("gitee", "gitcode"):
+            return {}, {"access_token": self.src_token}
+        if platform_name == "gitlab":
+            return {"PRIVATE-TOKEN": self.src_token}, {}
+        return {}, {}

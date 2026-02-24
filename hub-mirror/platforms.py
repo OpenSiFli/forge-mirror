@@ -3,6 +3,7 @@ import logging
 from abc import ABC, abstractmethod
 from enum import Enum
 from typing import Any, Dict, List, Optional, Sequence, Type
+from urllib.parse import quote
 
 import requests
 
@@ -36,13 +37,33 @@ class GitPlatform(ABC):
     api_base: str
     repo_field: str
 
-    def get_clone_repo_base(self, account: str, clone_style: str) -> str:
-        prefix = "https://" if clone_style == "https" else "git@"
-        suffix = "/" if clone_style == "https" else ":"
-        return f"{prefix}{self.host}{suffix}{account}"
+    def _join_account_path(self, account: str) -> str:
+        return f"/{account}" if account else ""
 
-    def get_push_repo_base(self, account: str) -> str:
-        return f"git@{self.host}:{account}"
+    def get_clone_repo_base(
+        self,
+        account: str,
+        transport: str,
+        ssh_user: str = "git",
+    ) -> str:
+        account_path = self._join_account_path(account)
+        if transport == "ssh":
+            return f"ssh://{ssh_user}@{self.host}{account_path}"
+        return f"https://{self.host}{account_path}"
+
+    def get_push_repo_base(
+        self,
+        account: str,
+        transport: str,
+        token: str = "",
+        ssh_user: str = "git",
+    ) -> str:
+        account_path = self._join_account_path(account)
+        if transport == "ssh":
+            return f"ssh://{ssh_user}@{self.host}{account_path}"
+        if token:
+            return f"https://{quote(token, safe='')}@{self.host}{account_path}"
+        return f"https://{self.host}{account_path}"
 
     def repo_list_url(self, account: str, account_type: str) -> str:
         return f"{self.api_base}/{account_type}s/{account}/{self.repo_field}"
