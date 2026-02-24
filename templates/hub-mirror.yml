@@ -52,8 +52,14 @@ spec:
     src-endpoint:
       description: "Source self-hosted endpoint (e.g. gitlab.example.com)"
       default: ""
+    src-api-endpoint:
+      description: "Source API endpoint (optional, overrides API host used for source requests)"
+      default: ""
     dst-endpoint:
       description: "Destination self-hosted endpoint"
+      default: ""
+    dst-api-endpoint:
+      description: "Destination API endpoint (optional, overrides API host used for destination requests)"
       default: ""
 
     repos:
@@ -146,7 +152,9 @@ spec:
         --src-account-type "$[[ inputs.src-account-type ]]" \
         --dst-account-type "$[[ inputs.dst-account-type ]]" \
         --src-endpoint "$[[ inputs.src-endpoint ]]" \
+        --src-api-endpoint "$[[ inputs.src-api-endpoint ]]" \
         --dst-endpoint "$[[ inputs.dst-endpoint ]]" \
+        --dst-api-endpoint "$[[ inputs.dst-api-endpoint ]]" \
         --src-transport "$[[ inputs.src-transport ]]" \
         --dst-transport "$[[ inputs.dst-transport ]]" \
         --ssh-user "$[[ inputs.ssh-user ]]" \
