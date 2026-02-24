@@ -165,7 +165,7 @@ def test_bare_git_platform_noop_behaviors() -> None:
         "ssh://git@git.example.com/my-org"
     )
     assert platform.get_push_repo_base("", "https", token="token") == (
-        "https://git.example.com/my-org"
+        "https://token@git.example.com/my-org"
     )
 
     assert (

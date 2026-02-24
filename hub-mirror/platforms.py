@@ -585,6 +585,8 @@ class BareGitPlatform(GitPlatform):
             base = f"{base}/{account}"
         if transport == "ssh":
             return f"ssh://{ssh_user}@{base}"
+        if token:
+            return f"https://{quote(token, safe='')}@{base}"
         return f"https://{base}"
 
     def repo_list_url(self, account: str, account_type: str) -> str:
