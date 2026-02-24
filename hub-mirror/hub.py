@@ -25,7 +25,8 @@ class Hub(object):
         dst_api_endpoint: str = "",
         src_transport: str = "https",
         dst_transport: str = "ssh",
-        ssh_user: str = "git",
+        src_ssh_user: str = "git",
+        dst_ssh_user: str = "git",
         api_timeout: int = 60,
         dst_visibility: RepoVisibility = RepoVisibility.AUTO,
     ) -> None:
@@ -39,7 +40,8 @@ class Hub(object):
         self.dst_account: str = dst_account
         self.src_transport: str = src_transport
         self.dst_transport: str = dst_transport
-        self.ssh_user: str = ssh_user
+        self.src_ssh_user: str = (src_ssh_user or "git").strip() or "git"
+        self.dst_ssh_user: str = (dst_ssh_user or "git").strip() or "git"
 
         self.src_platform: GitPlatform = get_platform(
             self.src_type,
@@ -64,13 +66,13 @@ class Hub(object):
         self.src_repo_base: str = self.src_platform.get_clone_repo_base(
             self.src_account,
             self.src_transport,
-            ssh_user=self.ssh_user,
+            ssh_user=self.src_ssh_user,
         )
         self.dst_repo_base: str = self.dst_platform.get_push_repo_base(
             self.dst_account,
             self.dst_transport,
             token=self.dst_token,
-            ssh_user=self.ssh_user,
+            ssh_user=self.dst_ssh_user,
         )
 
     def has_dst_repo(self, repo_name: str) -> bool:

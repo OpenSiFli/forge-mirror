@@ -40,7 +40,8 @@ class MirrorConfig:
     dst_api_endpoint: str = ""
     src_transport: str = "https"
     dst_transport: str = "ssh"
-    ssh_user: str = "git"
+    src_ssh_user: str = "git"
+    dst_ssh_user: str = "git"
     cache_path: str = "hub-mirror-cache"
     repos: str = ""
     push_strategy: str = "safe"
@@ -73,7 +74,8 @@ class HubMirror(object):
             dst_api_endpoint=config.dst_api_endpoint,
             src_transport=config.src_transport,
             dst_transport=config.dst_transport,
-            ssh_user=config.ssh_user,
+            src_ssh_user=config.src_ssh_user,
+            dst_ssh_user=config.dst_ssh_user,
             api_timeout=parse_duration_seconds(config.api_timeout),
             dst_visibility=config.dst_visibility,
         )
@@ -199,7 +201,8 @@ CLI_OPTIONS = [
         type=click.Choice(ALLOWED_TRANSPORTS, case_sensitive=False),
         show_default=True,
     ),
-    click.option("--ssh-user", default="git", show_default=True),
+    click.option("--src-ssh-user", default="git", show_default=True),
+    click.option("--dst-ssh-user", default="git", show_default=True),
     click.option(
         "--cache-path",
         default="hub-mirror-cache",

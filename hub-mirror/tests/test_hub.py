@@ -76,3 +76,20 @@ def test_dynamic_list_not_supported_for_bare_git_platform() -> None:
 
     with pytest.raises(ValueError, match="dynamic listing"):
         hub.dynamic_list()
+
+
+def test_supports_distinct_src_and_dst_ssh_user() -> None:
+    hub = Hub(
+        src_platform="github",
+        src_account="src",
+        dst_platform="github",
+        dst_account="dst",
+        dst_token="dst-token",
+        src_transport="ssh",
+        dst_transport="ssh",
+        src_ssh_user="git-src",
+        dst_ssh_user="git-dst",
+    )
+
+    assert hub.src_repo_base == "ssh://git-src@github.com/src"
+    assert hub.dst_repo_base == "ssh://git-dst@github.com/dst"

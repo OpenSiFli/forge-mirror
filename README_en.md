@@ -49,7 +49,8 @@ Common optional:
 - `src_api_endpoint` / `dst_api_endpoint` (API endpoints; override platform API request address when set)
 - `src_transport` (default `https`)
 - `dst_transport` (default `ssh`)
-- `ssh_user` (default `git`)
+- `src_ssh_user` (source SSH username, default `git`)
+- `dst_ssh_user` (destination SSH username, default `git`)
 - `repos` (YAML repository config, see details below)
 - `push_strategy` (`safe` / `force` / `no`)
 - `log_level` (`DEBUG` / `INFO` / `WARNING` / `ERROR`)
@@ -334,3 +335,4 @@ include:
 | (none) | `repos.refs` |
 | (none) | `dst_platform: git` |
 | (none) | `src_api_endpoint` / `dst_api_endpoint` |
+| unified `ssh_user` | `src_ssh_user` + `dst_ssh_user` |

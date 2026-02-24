@@ -49,7 +49,8 @@ steps:
 - `src_api_endpoint` / `dst_api_endpoint`（API 地址；配置后将覆盖对应平台 API 请求地址）
 - `src_transport`（默认 `https`）
 - `dst_transport`（默认 `ssh`）
-- `ssh_user`（默认 `git`）
+- `src_ssh_user`（源端 SSH 用户名，默认 `git`）
+- `dst_ssh_user`（目标端 SSH 用户名，默认 `git`）
 - `repos`（YAML 仓库配置，详见下文）
 - `push_strategy`（`safe` / `force` / `no`）
 - `log_level`（`DEBUG` / `INFO` / `WARNING` / `ERROR`）
@@ -334,3 +335,4 @@ include:
 | （无） | `repos.refs` |
 | （无） | `dst_platform: git` |
 | （无） | `src_api_endpoint` / `dst_api_endpoint` |
+| `ssh_user`（统一） | `src_ssh_user` + `dst_ssh_user` |

@@ -61,8 +61,11 @@ inputs:
   dst_transport:
     description: "Destination transport (https/ssh)."
     default: 'ssh'
-  ssh_user:
-    description: "SSH username."
+  src_ssh_user:
+    description: "Source SSH username."
+    default: 'git'
+  dst_ssh_user:
+    description: "Destination SSH username."
     default: 'git'
   push_strategy:
     description: "Push strategy: safe(--force-with-lease)/force(-f)/no(normal)."
@@ -199,7 +202,8 @@ runs:
           --dst-api-endpoint "${{ inputs.dst_api_endpoint }}" \
           --src-transport "${{ inputs.src_transport }}" \
           --dst-transport "${{ inputs.dst_transport }}" \
-          --ssh-user "${{ inputs.ssh_user }}" \
+          --src-ssh-user "${{ inputs.src_ssh_user }}" \
+          --dst-ssh-user "${{ inputs.dst_ssh_user }}" \
           --cache-path "$CACHE_PATH" \
           --repos "${{ inputs.repos }}" \
           --push-strategy "${{ inputs.push_strategy }}" \
