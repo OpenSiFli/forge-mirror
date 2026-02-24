@@ -108,24 +108,44 @@ class Mirror(object):
 
     @retry(wait=wait_exponential(), reraise=True, stop=stop_after_attempt(3))
     def _update(self, local_repo: git.Repo) -> None:
+        logger.info("Trying fetch/reset recovery...")
         try:
             if self._uses_ssh_for_src():
                 with local_repo.git.custom_environment(
                     GIT_SSH_COMMAND=self._ssh_command(self.src_key_path)
                 ):
-                    local_repo.git.pull(kill_after_timeout=self.timeout)
+                    local_repo.git.fetch(
+                        "--all", kill_after_timeout=self.timeout
+                    )
+                    local_repo.git.reset(
+                        "--hard",
+                        "origin/HEAD",
+                        kill_after_timeout=self.timeout,
+                    )
                     if self.lfs:
                         local_repo.git.lfs("fetch", "--all", "origin")
             else:
-                local_repo.git.pull(kill_after_timeout=self.timeout)
+                local_repo.git.fetch(
+                    "--all", kill_after_timeout=self.timeout
+                )
+                local_repo.git.reset(
+                    "--hard",
+                    "origin/HEAD",
+                    kill_after_timeout=self.timeout,
+                )
                 if self.lfs:
                     local_repo.git.lfs("fetch", "--all", "origin")
-        except git.exc.GitCommandError:
-            logger.warning(f"Updating failed, re-clone {self.src_name}")
+        except git.exc.GitCommandError as fetch_error:
+            logger.warning(
+                f"Fetch/reset recovery failed for {self.src_name}: "
+                f"{fetch_error}"
+            )
+            logger.warning(
+                f"Repository may be corrupted, rebuilding {self.src_name}..."
+            )
             shutil.rmtree(local_repo.working_dir)
             self._clone()
 
-    @retry(wait=wait_exponential(), reraise=True, stop=stop_after_attempt(3))
     def download(self) -> None:
         logger.info("(1/3) Downloading...")
         try:
