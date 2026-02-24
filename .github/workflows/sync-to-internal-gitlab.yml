@@ -29,7 +29,8 @@ jobs:
           src_account: ${{ github.repository_owner }}
           dst_platform: gitlab
           dst_account: ${{ secrets.GITLAB_NAMESPACE }}
-          dst_endpoint: ${{ secrets.GITLAB_URL }}
+          dst_endpoint: ${{ secrets.GITLAB_SSH_URL }}
+          dst_api_endpoint: ${{ secrets.GITLAB_URL }}
           dst_key: ${{ secrets.GITLAB_SSH_KEY }}
           dst_transport: ssh
           dst_token: ${{ secrets.GITLAB_TOKEN }}

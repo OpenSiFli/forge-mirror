@@ -35,7 +35,9 @@ class MirrorConfig:
     src_account_type: str = "user"
     dst_account_type: str = "user"
     src_endpoint: str = ""
+    src_api_endpoint: str = ""
     dst_endpoint: str = ""
+    dst_api_endpoint: str = ""
     src_transport: str = "https"
     dst_transport: str = "ssh"
     ssh_user: str = "git"
@@ -66,7 +68,9 @@ class HubMirror(object):
             src_account_type=config.src_account_type,
             dst_account_type=config.dst_account_type,
             src_endpoint=config.src_endpoint,
+            src_api_endpoint=config.src_api_endpoint,
             dst_endpoint=config.dst_endpoint,
+            dst_api_endpoint=config.dst_api_endpoint,
             src_transport=config.src_transport,
             dst_transport=config.dst_transport,
             ssh_user=config.ssh_user,
@@ -180,7 +184,9 @@ CLI_OPTIONS = [
     click.option("--src-account-type", default="user", show_default=True),
     click.option("--dst-account-type", default="user", show_default=True),
     click.option("--src-endpoint", default="", show_default=True),
+    click.option("--src-api-endpoint", default="", show_default=True),
     click.option("--dst-endpoint", default="", show_default=True),
+    click.option("--dst-api-endpoint", default="", show_default=True),
     click.option(
         "--src-transport",
         default="https",

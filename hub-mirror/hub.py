@@ -20,7 +20,9 @@ class Hub(object):
         src_account_type: str = "user",
         dst_account_type: str = "user",
         src_endpoint: str = "",
+        src_api_endpoint: str = "",
         dst_endpoint: str = "",
+        dst_api_endpoint: str = "",
         src_transport: str = "https",
         dst_transport: str = "ssh",
         ssh_user: str = "git",
@@ -40,10 +42,14 @@ class Hub(object):
         self.ssh_user: str = ssh_user
 
         self.src_platform: GitPlatform = get_platform(
-            self.src_type, endpoint=src_endpoint
+            self.src_type,
+            endpoint=src_endpoint,
+            api_endpoint=src_api_endpoint,
         )
         self.dst_platform: GitPlatform = get_platform(
-            self.dst_type, endpoint=dst_endpoint
+            self.dst_type,
+            endpoint=dst_endpoint,
+            api_endpoint=dst_api_endpoint,
         )
         self.src_platform.validate_account_type(
             self.src_account_type, "source"

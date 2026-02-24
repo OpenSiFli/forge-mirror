@@ -37,9 +37,14 @@ class GitPlatform(ABC):
     api_base: str
     repo_field: str
 
-    def __init__(self, endpoint: str = "") -> None:
+    def __init__(
+        self,
+        endpoint: str = "",
+        api_endpoint: str = "",
+    ) -> None:
         # Keep a uniform constructor signature for typing convenience.
         del endpoint
+        del api_endpoint
 
     def _join_account_path(self, account: str) -> str:
         return f"/{account}" if account else ""
@@ -188,7 +193,11 @@ class GitHubPlatform(GitPlatform):
     name = "github"
     repo_field = "repos"
 
-    def __init__(self, _endpoint: str = "") -> None:
+    def __init__(
+        self,
+        _endpoint: str = "",
+        _api_endpoint: str = "",
+    ) -> None:
         self.host: str = "github.com"
         self.api_base: str = "https://api.github.com"
 
@@ -270,7 +279,11 @@ class GiteePlatform(GitPlatform):
     name = "gitee"
     repo_field = "repos"
 
-    def __init__(self, _endpoint: str = "") -> None:
+    def __init__(
+        self,
+        _endpoint: str = "",
+        _api_endpoint: str = "",
+    ) -> None:
         self.host: str = "gitee.com"
         self.api_base: str = "https://gitee.com/api/v5"
 
@@ -352,7 +365,11 @@ class GitcodePlatform(GitPlatform):
     name = "gitcode"
     repo_field = "repos"
 
-    def __init__(self, _endpoint: str = "") -> None:
+    def __init__(
+        self,
+        _endpoint: str = "",
+        _api_endpoint: str = "",
+    ) -> None:
         self.host: str = "gitcode.com"
         self.api_base: str = "https://api.gitcode.com/api/v5"
 
@@ -433,45 +450,16 @@ class GitLabPlatform(GitPlatform):
     name = "gitlab"
     repo_field = "projects"
 
-    def __init__(self, endpoint: str = "") -> None:
+    def __init__(
+        self,
+        endpoint: str = "",
+        api_endpoint: str = "",
+    ) -> None:
         host = (endpoint or "gitlab.com").strip().strip("/")
-        api_host = host
-        if ":" in host:
-            maybe_host, maybe_port = host.rsplit(":", 1)
-            if maybe_host and maybe_port.isdigit():
-                api_host = maybe_host
-
+        api_host = (api_endpoint or host).strip().strip("/")
         self.host: str = host
         self.api_host: str = api_host
         self.api_base: str = f"https://{api_host}/api/v4"
-
-    def get_clone_repo_base(
-        self,
-        account: str,
-        transport: str,
-        ssh_user: str = "git",
-    ) -> str:
-        account_path = self._join_account_path(account)
-        if transport == "ssh":
-            return f"ssh://{ssh_user}@{self.host}{account_path}"
-        return f"https://{self.api_host}{account_path}"
-
-    def get_push_repo_base(
-        self,
-        account: str,
-        transport: str,
-        token: str = "",
-        ssh_user: str = "git",
-    ) -> str:
-        account_path = self._join_account_path(account)
-        if transport == "ssh":
-            return f"ssh://{ssh_user}@{self.host}{account_path}"
-        if token:
-            return (
-                f"https://{quote(token, safe='')}@"
-                f"{self.api_host}{account_path}"
-            )
-        return f"https://{self.api_host}{account_path}"
 
     def validate_account_type(self, account_type: str, role: str) -> None:
         self._validate_account_type(account_type, role, ("user", "group"))
@@ -584,7 +572,11 @@ class BareGitPlatform(GitPlatform):
     name = "git"
     repo_field = ""
 
-    def __init__(self, endpoint: str = "") -> None:
+    def __init__(
+        self,
+        endpoint: str = "",
+        _api_endpoint: str = "",
+    ) -> None:
         cleaned_endpoint = endpoint.strip().strip("/")
         if not cleaned_endpoint:
             raise ValueError(
@@ -666,7 +658,11 @@ class BareGitPlatform(GitPlatform):
         return True
 
 
-def get_platform(name: str, endpoint: str = "") -> GitPlatform:
+def get_platform(
+    name: str,
+    endpoint: str = "",
+    api_endpoint: str = "",
+) -> GitPlatform:
     normalized_name = name.lower()
     platforms: Dict[str, Type[GitPlatform]] = {
         "github": GitHubPlatform,
@@ -681,4 +677,4 @@ def get_platform(name: str, endpoint: str = "") -> GitPlatform:
         raise ValueError(
             f"Unsupported platform_type '{name}'. Supported: {supported}"
         )
-    return platform_cls(endpoint)
+    return platform_cls(endpoint, api_endpoint)

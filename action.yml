@@ -41,8 +41,14 @@ inputs:
   src_endpoint:
     description: "Source self-hosted endpoint, e.g. gitlab.example.com (no https://)."
     default: ''
+  src_api_endpoint:
+    description: "Source API endpoint (optional). When set, overrides API host used for source platform requests."
+    default: ''
   dst_endpoint:
     description: "Destination self-hosted endpoint, e.g. gitlab.example.com (no https://)."
+    default: ''
+  dst_api_endpoint:
+    description: "Destination API endpoint (optional). When set, overrides API host used for destination platform requests."
     default: ''
 
   repos:
@@ -188,7 +194,9 @@ runs:
           --src-account-type "${{ inputs.src_account_type }}" \
           --dst-account-type "${{ inputs.dst_account_type }}" \
           --src-endpoint "${{ inputs.src_endpoint }}" \
+          --src-api-endpoint "${{ inputs.src_api_endpoint }}" \
           --dst-endpoint "${{ inputs.dst_endpoint }}" \
+          --dst-api-endpoint "${{ inputs.dst_api_endpoint }}" \
           --src-transport "${{ inputs.src_transport }}" \
           --dst-transport "${{ inputs.dst_transport }}" \
           --ssh-user "${{ inputs.ssh_user }}" \

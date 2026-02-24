@@ -205,27 +205,39 @@ def test_bare_git_platform_noop_behaviors() -> None:
         platform.repo_list_url("", "user")
 
 
-def test_gitlab_endpoint_with_ssh_port() -> None:
-    platform = GitLabPlatform("gitlab.sifli.com:8218")
+def test_gitlab_separated_endpoint_and_api_endpoint() -> None:
+    platform = GitLabPlatform(
+        endpoint="gitlab.sifli.com:8218",
+        api_endpoint="gitlab.sifli.com",
+    )
 
     assert platform.api_base == "https://gitlab.sifli.com/api/v4"
     assert platform.get_clone_repo_base("sifli", "ssh") == (
         "ssh://git@gitlab.sifli.com:8218/sifli"
     )
     assert platform.get_clone_repo_base("sifli", "https") == (
-        "https://gitlab.sifli.com/sifli"
+        "https://gitlab.sifli.com:8218/sifli"
     )
     assert platform.get_push_repo_base("sifli", "ssh") == (
         "ssh://git@gitlab.sifli.com:8218/sifli"
     )
     assert platform.get_push_repo_base(
         "sifli", "https", token="token"
-    ) == "https://token@gitlab.sifli.com/sifli"
+    ) == "https://token@gitlab.sifli.com:8218/sifli"
 
 
 def test_get_platform_factory() -> None:
     platform = get_platform("git", endpoint="git.example.com/my-org")
     assert isinstance(platform, BareGitPlatform)
+
+    gitlab = get_platform(
+        "gitlab",
+        endpoint="gitlab.sifli.com:8218",
+        api_endpoint="gitlab.sifli.com",
+    )
+    assert isinstance(gitlab, GitLabPlatform)
+    assert gitlab.host == "gitlab.sifli.com:8218"
+    assert gitlab.api_base == "https://gitlab.sifli.com/api/v4"
 
     with pytest.raises(ValueError):
         get_platform("unknown-platform")
