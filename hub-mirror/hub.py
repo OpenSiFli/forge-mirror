@@ -102,12 +102,21 @@ class Hub(object):
         )
         return self._get_all_repo_names(url)
 
-    def update_dst_repo_visibility(self, repo_name: str) -> bool:
+    def update_dst_repo_visibility(
+        self,
+        repo_name: str,
+        visibility: RepoVisibility = RepoVisibility.AUTO,
+    ) -> bool:
+        target_visibility = (
+            visibility
+            if visibility != RepoVisibility.AUTO
+            else self.dst_visibility
+        )
         return self.dst_platform.update_repo_visibility(
             self.session,
             self.dst_account,
             repo_name,
-            self.dst_visibility,
+            target_visibility,
             self.dst_token,
             self.api_timeout,
         )

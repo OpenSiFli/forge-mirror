@@ -2,10 +2,11 @@ import logging
 import re
 import sys
 from dataclasses import dataclass
-from typing import Any, Callable, Dict, List, Optional, Sequence
+from typing import Any, Callable, List, Optional, Sequence
 
 import click
 
+from config import parse_repos_config, resolve_repo_config
 from hub import Hub
 from mirror import Mirror
 from platforms import ALLOWED_VISIBILITY, RepoVisibility
@@ -53,22 +54,6 @@ class MirrorConfig:
 class HubMirror(object):
     def __init__(self, config: MirrorConfig) -> None:
         self.config: MirrorConfig = config
-        # Phase 1 占位: Phase 2 将由 YAML repos 配置驱动。
-        self.white_list: List[str] = []
-        self.black_list: List[str] = []
-        self.static_list: List[str] = []
-        self.mappings: Dict[str, str] = {}
-
-    def test_black_white_list(self, repo: str) -> bool:
-        if repo in self.black_list:
-            logger.info(f"Skip, {repo} in black list: {self.black_list}")
-            return False
-
-        if self.white_list and repo not in self.white_list:
-            logger.info(f"Skip, {repo} not in white list: {self.white_list}")
-            return False
-
-        return True
 
     def run(self) -> None:
         config = self.config
@@ -89,44 +74,59 @@ class HubMirror(object):
             api_timeout=parse_duration_seconds(config.api_timeout),
             dst_visibility=config.dst_visibility,
         )
+        repos_config = parse_repos_config(config.repos)
 
-        repos: List[str] = self.static_list
-        src_repos: List[str] = repos if repos else hub.dynamic_list()
+        if repos_config.static:
+            src_repos = [repo.name for repo in repos_config.static]
+        else:
+            src_repos = hub.dynamic_list()
+
+        if repos_config.include:
+            include_set = set(repos_config.include)
+            src_repos = [repo for repo in src_repos if repo in include_set]
+        if repos_config.exclude:
+            exclude_set = set(repos_config.exclude)
+            src_repos = [repo for repo in src_repos if repo not in exclude_set]
+
+        src_repos = list(dict.fromkeys(src_repos))
 
         total: int = len(src_repos)
         succeeded: int = 0
         skip: int = 0
         failed_list: List[str] = []
         for src_repo in src_repos:
-            dst_repo: str = self.mappings.get(src_repo, src_repo)
+            repo_config = resolve_repo_config(src_repo, repos_config, config)
+            dst_repo: str = repo_config.dst_name
             logger.info(f"Map {src_repo} to {dst_repo}")
-            if self.test_black_white_list(src_repo):
-                logger.info(f"Backup {src_repo}")
-                try:
-                    mirror = Mirror(
-                        hub,
-                        src_repo,
-                        dst_repo,
-                        cache=config.cache_path,
-                        timeout=config.timeout,
-                        push_strategy=config.push_strategy,
-                        dst_transport=config.dst_transport,
-                        lfs=config.lfs,
+            logger.info(f"Backup {src_repo}")
+            try:
+                mirror = Mirror(
+                    hub,
+                    src_repo,
+                    dst_repo,
+                    cache=config.cache_path,
+                    timeout=config.timeout,
+                    push_strategy=repo_config.push_strategy,
+                    dst_transport=config.dst_transport,
+                    refs=repo_config.refs,
+                    lfs=config.lfs,
+                )
+                mirror.download()
+                mirror.create()
+                mirror.push()
+                if not hub.update_dst_repo_visibility(
+                    dst_repo,
+                    repo_config.visibility,
+                ):
+                    raise RuntimeError(
+                        f"Failed to update repo visibility for {dst_repo}"
                     )
-                    mirror.download()
-                    mirror.create()
-                    mirror.push()
-                    if not hub.update_dst_repo_visibility(dst_repo):
-                        raise RuntimeError(
-                            f"Failed to update repo visibility for {dst_repo}"
-                        )
-                    succeeded += 1
-                except Exception as e:
-                    logger.error(f"Mirror failed for {src_repo}: {e}")
-                    logger.debug("Mirror failure details", exc_info=True)
-                    failed_list.append(src_repo)
-            else:
-                skip += 1
+                succeeded += 1
+            except Exception as e:
+                logger.error(f"Mirror failed for {src_repo}: {e}")
+                logger.debug("Mirror failure details", exc_info=True)
+                failed_list.append(src_repo)
+
         failed: int = total - succeeded - skip
         summary = (
             f"Total: {total}, skip: {skip}, succeeded: {succeeded}, "

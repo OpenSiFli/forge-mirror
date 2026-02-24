@@ -3,11 +3,13 @@ import os
 import re
 import shlex
 import shutil
-from typing import List
+from fnmatch import fnmatch
+from typing import List, Optional
 
 import git
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from config import RefsConfig
 from hub import Hub
 from utils import cov2sec
 
@@ -24,6 +26,7 @@ class Mirror(object):
         timeout: str = "0",
         push_strategy: str = "safe",
         dst_transport: str = "ssh",
+        refs: Optional[RefsConfig] = None,
         lfs: bool = False,
     ) -> None:
         self.hub: Hub = hub
@@ -51,6 +54,7 @@ class Mirror(object):
                 "Invalid destination transport. Must be https or ssh."
             )
         self.dst_transport: str = normalized_dst_transport
+        self.refs: RefsConfig = refs or RefsConfig()
         self.lfs: bool = lfs
 
     def _ssh_command(self, key_path: str) -> str:
@@ -142,13 +146,81 @@ class Mirror(object):
             return False
         return True
 
-    def _build_push_cmd(self) -> List[str]:
-        cmd: List[str] = [
-            self.hub.dst_type,
-            "refs/remotes/origin/*:refs/heads/*",
-            "--tags",
-            "--prune",
+    def _filter_refs(
+        self,
+        patterns_include: List[str],
+        patterns_exclude: List[str],
+        ref_list: List[str],
+    ) -> List[str]:
+        if not patterns_include:
+            return []
+
+        filtered: List[str] = []
+        for ref in ref_list:
+            matched = any(
+                fnmatch(ref, pattern)
+                for pattern in patterns_include
+            )
+            if not matched:
+                continue
+
+            excluded = any(
+                fnmatch(ref, pattern)
+                for pattern in patterns_exclude
+            )
+            if not excluded:
+                filtered.append(ref)
+
+        # Keep order while de-duplicating.
+        return list(dict.fromkeys(filtered))
+
+    def _build_refspecs(
+        self,
+        refs_config: RefsConfig,
+        local_repo: git.Repo,
+    ) -> List[str]:
+        branch_lines = local_repo.git.for_each_ref(
+            "--format=%(refname)",
+            "refs/remotes/origin",
+        ).splitlines()
+        branches = []
+        for line in branch_lines:
+            ref_name = line.strip()
+            if not ref_name.startswith("refs/remotes/origin/"):
+                continue
+            branch = ref_name.replace("refs/remotes/origin/", "", 1)
+            if branch == "HEAD":
+                continue
+            branches.append(branch)
+
+        tags = [
+            tag.strip()
+            for tag in local_repo.git.tag("--list").splitlines()
+            if tag.strip()
         ]
+
+        filtered_branches = self._filter_refs(
+            refs_config.branches_include,
+            refs_config.branches_exclude,
+            branches,
+        )
+        filtered_tags = self._filter_refs(
+            refs_config.tags_include,
+            refs_config.tags_exclude,
+            tags,
+        )
+
+        refspecs: List[str] = []
+        for branch in filtered_branches:
+            refspecs.append(
+                f"refs/remotes/origin/{branch}:refs/heads/{branch}"
+            )
+        for tag in filtered_tags:
+            refspecs.append(f"refs/tags/{tag}:refs/tags/{tag}")
+        return refspecs
+
+    def _build_push_cmd(self, refspecs: List[str]) -> List[str]:
+        cmd: List[str] = [self.hub.dst_type, "--prune"] + refspecs
         if self.push_strategy == "force":
             return ["-f"] + cmd
         if self.push_strategy == "safe":
@@ -182,7 +254,12 @@ class Mirror(object):
             local_repo.delete_remote(self.hub.dst_type)
             local_repo.create_remote(self.hub.dst_type, self.dst_url)
 
-        push_cmd: List[str] = self._build_push_cmd()
+        refspecs: List[str] = self._build_refspecs(self.refs, local_repo)
+        if not refspecs:
+            logger.info("No refs matched the filtering rules, skip pushing.")
+            return
+
+        push_cmd: List[str] = self._build_push_cmd(refspecs)
         logger.info(f"(3/3) Pushing with strategy={self.push_strategy}...")
 
         if self.dst_transport == "ssh":
