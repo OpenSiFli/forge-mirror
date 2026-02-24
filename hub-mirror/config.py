@@ -173,7 +173,8 @@ def _parse_static(value: Any) -> List[RepoConfig]:
 
         if not isinstance(item, dict):
             raise ValueError(
-                f"static[{index}] must be a string or mapping, got {type(item)}"
+                f"static[{index}] must be a string or mapping, "
+                f"got {type(item)}"
             )
 
         supported_keys = {
@@ -186,7 +187,9 @@ def _parse_static(value: Any) -> List[RepoConfig]:
         unknown_keys = set(item.keys()) - supported_keys
         if unknown_keys:
             unknown = ", ".join(sorted(unknown_keys))
-            raise ValueError(f"static[{index}] has unsupported keys: {unknown}")
+            raise ValueError(
+                f"static[{index}] has unsupported keys: {unknown}"
+            )
 
         name = item.get("name")
         if not isinstance(name, str):
@@ -212,7 +215,10 @@ def _parse_static(value: Any) -> List[RepoConfig]:
         refs = RefsConfig()
         has_refs_override = "refs" in item
         if has_refs_override:
-            refs = _parse_refs_config(item.get("refs"), f"static[{index}].refs")
+            refs = _parse_refs_config(
+                item.get("refs"),
+                f"static[{index}].refs",
+            )
 
         repos.append(
             RepoConfig(
@@ -297,7 +303,9 @@ def resolve_repo_config(
         visibility=visibility,
         push_strategy=push_strategy,
         refs=refs,
-        has_dst_name_override=bool(repo_override and repo_override.has_dst_name_override),
+        has_dst_name_override=bool(
+            repo_override and repo_override.has_dst_name_override
+        ),
         has_visibility_override=bool(
             repo_override and repo_override.has_visibility_override
         ),
