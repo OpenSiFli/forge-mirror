@@ -2,7 +2,7 @@ stages:
   - build
 
 variables:
-  DOCKER_TLS_CERTDIR: "/certs"
+  DOCKER_TLS_CERTDIR: ""
   DOCKER_BUILDKIT: "1"
   IMAGE_NAME: "$CI_REGISTRY_IMAGE"
 
