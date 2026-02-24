@@ -1,4 +1,4 @@
-name: "Hub Mirror Action"
+name: "Forge Mirror"
 description: "Mirror repos between Git hosting platforms."
 author: "yikun"
 branding:
