@@ -1,78 +1,83 @@
-name: "Hub Mirror Action."
-description: "Mirror the organization repos between hub (github/gitee/gitLab)."
+name: "Hub Mirror Action"
+description: "Mirror repos between Git hosting platforms."
 author: "yikun"
 branding:
   icon: "upload-cloud"
   color: "gray-dark"
 inputs:
+  src_platform:
+    description: "Source platform (github/gitee/gitlab/gitcode/git)."
+    default: 'github'
+  src_account:
+    description: "Source account or organization name (optional for git platform)."
+    required: true
+  dst_platform:
+    description: "Destination platform (github/gitee/gitlab/gitcode/git)."
+    required: true
+  dst_account:
+    description: "Destination account or organization name (optional for git platform)."
+    required: true
+
   src_key:
-    description: "The private SSH key used to fetch code from source hub. Required when clone_style=ssh unless private_key is set. Takes precedence over private_key."
+    description: "Source SSH private key (required when src_transport=ssh)."
     required: false
   dst_key:
-    description: "The private SSH key used to push code to destination hub. Takes precedence over private_key."
+    description: "Destination SSH private key (required when dst_transport=ssh)."
     required: false
-  private_key:
-    description: "Fallback private SSH key used when src_key or dst_key is empty."
+  src_token:
+    description: "Source API token."
     required: false
   dst_token:
-    description: "The app token which is used to  create repo in destination hub."
+    description: "Destination API token used to create/update repositories."
     required: true
-  dst:
-    description: "Destination name. Such as `gitee/kunpengcompute`."
-    required: true
-  dst_endpoint:
-    description: "Destination endpoint for self-hosted, currently only Gitlab is supported, like gitlab.example.com (no https:// prefix)."
-    default: ''
-  src:
-    description: "Source name. Such as `github/kunpengcompute`."
-    required: true
-  src_endpoint:
-    description: "Source endpoint for self-hosted, currently only Gitlab is supported, like gitlab.example.com (no https:// prefix)."
-    default: ''
-  account_type:
-    description: "The account type. Such as org, user, group."
-    default: 'user'
+
   src_account_type:
-    description: "The src account type. Such as org, user, group."
-    default: ''
+    description: "Source account type (user/org/group)."
+    default: 'user'
   dst_account_type:
-    description: "The dst account type. Such as org, user, group."
+    description: "Destination account type (user/org/group)."
+    default: 'user'
+
+  src_endpoint:
+    description: "Source self-hosted endpoint, e.g. gitlab.example.com (no https://)."
     default: ''
-  clone_style:
-    description: "The git clone style, https or ssh."
+  dst_endpoint:
+    description: "Destination self-hosted endpoint, e.g. gitlab.example.com (no https://)."
+    default: ''
+
+  repos:
+    description: "YAML repos config (static/include/exclude/mappings/refs)."
+    default: ''
+
+  src_transport:
+    description: "Source transport (https/ssh)."
     default: 'https'
-  cache_path:
-    description: "The path to cache the source repos code. Relative paths will be prefixed with `github.workspace`."
-    default: 'hub-mirror-cache'
-  black_list:
-    description: "Hight priority, the back list of mirror repo. like 'repo1,repo2,repo3'"
-    default: ''
-  white_list:
-    description: "Low priority, the white list of mirror repo. like 'repo1,repo2,repo3'"
-    default: ''
-  static_list:
-    description: "Only mirror repo in the static list, but don't get from repo api (the white/black list is still available). like 'repo1,repo2,repo3'"
-    default: ''
-  force_update:
-    description: "Force to update the destination repo, use '-f' flag do 'git push'"
-    default: false
-  debug:
-    description: "Enable the debug flag to show detail log"
-    default: false
+  dst_transport:
+    description: "Destination transport (https/ssh)."
+    default: 'ssh'
+  ssh_user:
+    description: "SSH username."
+    default: 'git'
+  push_strategy:
+    description: "Push strategy: safe(--force-with-lease)/force(-f)/no(normal)."
+    default: 'safe'
+  log_level:
+    description: "Log level (DEBUG/INFO/WARNING/ERROR)."
+    default: 'INFO'
   timeout:
-    description: "Set the timeout for every git command, like '600'=>600s, '30m'=>30 mins, '1h'=>1 hours"
+    description: "Git command timeout, e.g. 30m, 1h, 600."
     default: '30m'
   api_timeout:
-    description: "Set the timeout for API requests (in seconds)."
+    description: "API timeout, e.g. 60, 2m."
     default: '60'
-  mappings:
-    description: "The source repos mappings, such as 'A=>B, C=>CC', source repo name would be mapped follow the rule: A to B, C to CC. Mapping is not transitive."
-    default: ''
+  cache_path:
+    description: "Local cache path for repositories. Relative paths are prefixed with github.workspace."
+    default: 'hub-mirror-cache'
   lfs:
-    description: "Enable Git LFS support."
+    description: "Enable Git LFS."
     default: false
   dst_visibility:
-    description: "Set destination repo visibility to public, private, or auto (preserve destination visibility)."
+    description: "Destination visibility (auto/public/private)."
     default: 'auto'
 runs:
   using: "composite"
@@ -118,80 +123,79 @@ runs:
       shell: bash
 
     - name: Configure SSH
+      if: ${{ inputs.src_transport == 'ssh' || inputs.dst_transport == 'ssh' }}
       run: |
         set -euo pipefail
         mkdir -p ~/.ssh
 
+        SRC_TRANSPORT="${{ inputs.src_transport }}"
+        DST_TRANSPORT="${{ inputs.dst_transport }}"
         SRC_KEY="${{ inputs.src_key }}"
         DST_KEY="${{ inputs.dst_key }}"
-        PRIVATE_KEY="${{ inputs.private_key }}"
 
-        CLONE_STYLE="${{ inputs.clone_style }}"
+        if [[ "$SRC_TRANSPORT" == "ssh" ]]; then
+          if [[ -z "$SRC_KEY" ]]; then
+            echo "Error: src_key is required when src_transport=ssh." >&2
+            exit 1
+          fi
+          printf "%s" "$SRC_KEY" > ~/.ssh/id_rsa_src
+          chmod 600 ~/.ssh/id_rsa_src
+        fi
 
-        if [[ -z "$PRIVATE_KEY" ]]; then
+        if [[ "$DST_TRANSPORT" == "ssh" ]]; then
           if [[ -z "$DST_KEY" ]]; then
-            echo "Error: dst_key is required unless private_key is set." >&2
+            echo "Error: dst_key is required when dst_transport=ssh." >&2
             exit 1
           fi
-          if [[ "$CLONE_STYLE" == "ssh" && -z "$SRC_KEY" ]]; then
-            echo "Error: src_key is required when clone_style=ssh unless private_key is set." >&2
-            exit 1
-          fi
+          printf "%s" "$DST_KEY" > ~/.ssh/id_rsa_dst
+          chmod 600 ~/.ssh/id_rsa_dst
         fi
 
-        if [[ -z "$SRC_KEY" ]]; then
-          SRC_KEY="$PRIVATE_KEY"
-        fi
-        if [[ -z "$DST_KEY" ]]; then
-          DST_KEY="$PRIVATE_KEY"
-        fi
-
-        printf "%s" "$SRC_KEY" > ~/.ssh/id_rsa_src
-        printf "%s" "$DST_KEY" > ~/.ssh/id_rsa_dst
-        chmod 600 ~/.ssh/id_rsa_src ~/.ssh/id_rsa_dst
+        printf "Host *\n  StrictHostKeyChecking no\n  UserKnownHostsFile=/dev/null\n" > ~/.ssh/config
+        chmod 600 ~/.ssh/config
       shell: bash
 
     - name: Run Hub Mirror
       run: |
-        # Set debug mode if requested
-        if [[ "${{ inputs.debug }}" == "true" ]]; then
+        if [[ "${{ inputs.log_level }}" == "DEBUG" ]]; then
           set -x
         fi
-        
-        # Ensure git lfs is available
+
         if ! command -v git-lfs &> /dev/null; then
-             sudo apt-get update && sudo apt-get install -y git-lfs
+          sudo apt-get update && sudo apt-get install -y git-lfs
         fi
         git lfs install
 
-        # Resolve cache path to a writable workspace location
         CACHE_PATH="${{ inputs.cache_path }}"
         if [[ "$CACHE_PATH" == /github/workspace* ]]; then
-            CACHE_PATH="${{ github.workspace }}${CACHE_PATH#/github/workspace}"
+          CACHE_PATH="${{ github.workspace }}${CACHE_PATH#/github/workspace}"
         fi
         if [[ "$CACHE_PATH" != /* ]]; then
-            CACHE_PATH="${{ github.workspace }}/$CACHE_PATH"
+          CACHE_PATH="${{ github.workspace }}/$CACHE_PATH"
         fi
         mkdir -p "$CACHE_PATH"
         echo "Using CACHE_PATH: $CACHE_PATH"
 
         uv run --project ${{ github.action_path }}/hub-mirror hubmirror \
-          --src "${{ inputs.src }}" \
-          --dst "${{ inputs.dst }}" \
+          --src-platform "${{ inputs.src_platform }}" \
+          --src-account "${{ inputs.src_account }}" \
+          --dst-platform "${{ inputs.dst_platform }}" \
+          --dst-account "${{ inputs.dst_account }}" \
           --dst-token "${{ inputs.dst_token }}" \
-          --account-type "${{ inputs.account_type }}" \
+          --src-token "${{ inputs.src_token }}" \
           --src-account-type "${{ inputs.src_account_type }}" \
           --dst-account-type "${{ inputs.dst_account_type }}" \
-          --clone-style "${{ inputs.clone_style }}" \
+          --src-endpoint "${{ inputs.src_endpoint }}" \
+          --dst-endpoint "${{ inputs.dst_endpoint }}" \
+          --src-transport "${{ inputs.src_transport }}" \
+          --dst-transport "${{ inputs.dst_transport }}" \
+          --ssh-user "${{ inputs.ssh_user }}" \
           --cache-path "$CACHE_PATH" \
-          --black-list "${{ inputs.black_list }}" \
-          --white-list "${{ inputs.white_list }}" \
-          --static-list "${{ inputs.static_list }}" \
-          --force-update "${{ inputs.force_update }}" \
-          --debug "${{ inputs.debug }}" \
+          --repos "${{ inputs.repos }}" \
+          --push-strategy "${{ inputs.push_strategy }}" \
+          --log-level "${{ inputs.log_level }}" \
           --timeout "${{ inputs.timeout }}" \
           --api-timeout "${{ inputs.api_timeout }}" \
-          --mappings "${{ inputs.mappings }}" \
           --lfs "${{ inputs.lfs }}" \
-          --dst-visibility "${{ inputs.dst_visibility }}" \
+          --dst-visibility "${{ inputs.dst_visibility }}"
       shell: bash
