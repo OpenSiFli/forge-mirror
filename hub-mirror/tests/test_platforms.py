@@ -205,6 +205,24 @@ def test_bare_git_platform_noop_behaviors() -> None:
         platform.repo_list_url("", "user")
 
 
+def test_gitlab_endpoint_with_ssh_port() -> None:
+    platform = GitLabPlatform("gitlab.sifli.com:8218")
+
+    assert platform.api_base == "https://gitlab.sifli.com/api/v4"
+    assert platform.get_clone_repo_base("sifli", "ssh") == (
+        "ssh://git@gitlab.sifli.com:8218/sifli"
+    )
+    assert platform.get_clone_repo_base("sifli", "https") == (
+        "https://gitlab.sifli.com/sifli"
+    )
+    assert platform.get_push_repo_base("sifli", "ssh") == (
+        "ssh://git@gitlab.sifli.com:8218/sifli"
+    )
+    assert platform.get_push_repo_base(
+        "sifli", "https", token="token"
+    ) == "https://token@gitlab.sifli.com/sifli"
+
+
 def test_get_platform_factory() -> None:
     platform = get_platform("git", endpoint="git.example.com/my-org")
     assert isinstance(platform, BareGitPlatform)
